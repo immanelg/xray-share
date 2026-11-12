@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"crypto/rand"
+	// "crypto/rand"
 	"encoding/json"
 	"github.com/xtls/libxray/share"
 )
@@ -16,12 +16,13 @@ func main() {
 		fmt.Fprintf(os.Stderr, "cannot convert: %v", err)
 		return
 	}
-	cfg, errjson := json.Marshal(cfgjson)
+	cfg, errjson := json.MarshalIndent(cfgjson, "", "  ")
 	if errjson != nil {
 		fmt.Fprintf(os.Stderr, "cannot marshal: %v", errjson)
 		return
 	}
-	fh, errcreate := os.Create("outbounds-generated-"+rand.Text()+".jsonc")
+	// fh, errcreate := os.Create("outbounds-generated-"+rand.Text()+".jsonc")
+	fh, errcreate := os.Create("outbounds-from-url.jsonc")
 	if errcreate != nil {
 		fmt.Fprintf(os.Stderr, "cannot create: %v", errcreate)
 		return
