@@ -1,4 +1,4 @@
-module xray-shareurl-tool
+module xray-shareurl
 
 go 1.27.3
 
