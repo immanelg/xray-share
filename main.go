@@ -2,12 +2,21 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
+	"runtime"
+
 	// "crypto/rand"
 	"encoding/json"
-	"github.com/xtls/libxray/share"
 	"flag"
+
+	"github.com/xtls/libxray/share"
 )
+
+const version = "<devel>"
+const commitHash = "<unknown commit>"
 
 func assertSuccess(message string, err error) {
 	if err != nil {
@@ -16,11 +25,37 @@ func assertSuccess(message string, err error) {
 	}
 }
 
+func mustReadEntireFile(name string) []byte {
+	path, errParseUrl := url.Parse(name)
+	assertSuccess("cannot parse file url", errParseUrl)
+	
+	if path.Scheme == "" {
+		content, errReadIn := os.ReadFile(name)
+		assertSuccess("cannot read input file", errReadIn)
+		return content
+	}
+	hclient := http.DefaultClient
+	response, errReadIn := hclient.Get(name)
+	assertSuccess("cannot read remote file", errReadIn)
+	body, _ := io.ReadAll(response.Body)
+	return body
+}
+
+func mustWriteEntireFile(name string, content []byte) {
+	fh, errCreat := os.Create(name)
+	assertSuccess("cannot create", errCreat)
+
+	_, errWrite := fh.Write(content)
+	assertSuccess("cannot write", errWrite)
+}
+
 func main() {
+	var printVersion bool
 	var configToUrl bool
 	var urlToConfig bool
 	var inFile string
 	var outFile string
+	flag.BoolVar(&printVersion, "V", false, "version")
 	flag.BoolVar(&configToUrl, "C", false, "config to url")
 	flag.BoolVar(&urlToConfig, "U", false, "urls to config")
 	flag.StringVar(&inFile, "i", "", "in file")
@@ -28,9 +63,11 @@ func main() {
 	flag.Parse()
 
 	switch {
+	case printVersion:
+		fmt.Println("xray-sharetool", version, commitHash, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+		os.Exit(0)
 	case urlToConfig:
-		links, errReadIn := os.ReadFile(inFile)
-		assertSuccess("cannot read input file", errReadIn)
+		links := mustReadEntireFile(inFile)
 
 		cfgjson, errconv := share.ConvertShareLinksToXrayJson(string(links), "")
 		assertSuccess("cannot convert", errconv)
@@ -39,25 +76,15 @@ func main() {
 		assertSuccess("cannot marshal", errjson)
 
 		if outFile == "" { outFile = "generated-config.json" }
-		// fh, errcreate := os.Create("outbounds-generated-"+rand.Text()+".jsonc")
-		fh, errcreate := os.Create(outFile)
-		assertSuccess("cannot create", errcreate)
-
-		_, errwrite := fh.Write(cfg)
-		assertSuccess("cannot write", errwrite)
+		mustWriteEntireFile(outFile, cfg)
 	case configToUrl:
-		cfg, errReadIn := os.ReadFile(inFile)
-		assertSuccess("cannot read input file", errReadIn)
+		cfg := mustReadEntireFile(inFile)
 
 		links, errconv := share.ConvertXrayJsonToShareLinks(cfg)
 		assertSuccess("cannot convert", errconv)
 
 		if outFile == "" { outFile = "generated-links.txt" }
-		fh, errcreate := os.Create(outFile)
-		assertSuccess("cannot create", errcreate)
-
-		_, errwrite := fh.Write([]byte(links))
-		assertSuccess("cannot write", errwrite)
+		mustWriteEntireFile(outFile, []byte(links))
 
 	default:
 		fmt.Printf("one of commands must be specified\n")
