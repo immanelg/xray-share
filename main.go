@@ -101,7 +101,11 @@ func main() {
 
 	case testConfigs:
 		fmt.Fprintf(os.Stderr, "unimplemented!\n")
+		// hm. input can be both formats: sub.txt or sub.json from remote host / local file
+
+		// investigate this
 		// xray.PingBatch()
+		// i will sleep now
 	default:
 		fmt.Printf("one of commands must be specified\n")
 		flag.Usage()
