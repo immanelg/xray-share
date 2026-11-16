@@ -13,6 +13,7 @@ import (
 	"flag"
 
 	"github.com/xtls/libxray/share"
+	// "github.com/xtls/libxray/xray"
 )
 
 const version = "<devel>"
@@ -50,16 +51,28 @@ func mustWriteEntireFile(name string, content []byte) {
 }
 
 func main() {
+	// commands
 	var printVersion bool
 	var configToUrl bool
 	var urlToConfig bool
-	var inFile string
-	var outFile string
+	var testConfigs bool
 	flag.BoolVar(&printVersion, "V", false, "version")
 	flag.BoolVar(&configToUrl, "C", false, "config to url")
 	flag.BoolVar(&urlToConfig, "U", false, "urls to config")
+	flag.BoolVar(&testConfigs, "T", false, "filter out bad configs")
+
+	// parameters
+	var inFile string
+	var outFile string
+	var testUrl string
+	var testFiltersBelowTimeout int
+	var testFiltersAboveTimeout int
 	flag.StringVar(&inFile, "i", "", "in file")
 	flag.StringVar(&outFile, "o", "", "out file")
+	flag.StringVar(&testUrl, "turl", "https://gstatic.com/generate_204", "test max timeout")
+	flag.IntVar(&testFiltersAboveTimeout, "tmax", 3000, "test max timeout")
+	flag.IntVar(&testFiltersBelowTimeout, "tmix", 100, "test min timeout")
+
 	flag.Parse()
 
 	switch {
@@ -86,6 +99,9 @@ func main() {
 		if outFile == "" { outFile = "generated-links.txt" }
 		mustWriteEntireFile(outFile, []byte(links))
 
+	case testConfigs:
+		fmt.Fprintf(os.Stderr, "unimplemented!\n")
+		// xray.PingBatch()
 	default:
 		fmt.Printf("one of commands must be specified\n")
 		flag.Usage()
