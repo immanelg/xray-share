@@ -1,0 +1,11 @@
+#!/bin/sh
+
+OPTS='-tmax 3000 -turl https://google.com'
+mkdir -p confs
+while :; do 
+    rm -f confs/*
+    cp base.json confs
+    xray-share -T $OPTS -i https://raw.githubusercontent.com/free-nodes/v2rayfree/main/sub -o free-nodes.json  
+    xray -confdir confs
+    sleep 1h
+done

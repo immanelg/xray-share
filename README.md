@@ -22,6 +22,8 @@ cp base.json config/   # this is your own base config that includes inbounds, ru
 xray -confdir config/
 ```
 
+See [./xray-rotator](example script).
+
 # Commands
 ```sh
 -V

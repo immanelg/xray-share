@@ -1,0 +1,108 @@
+{
+  "log": {
+    "loglevel": "info"
+  },
+  "policy": {
+    "levels": {
+      "8": {
+        "connIdle": 300,
+        "downlinkOnly": 1,
+        "handshake": 4,
+        "uplinkOnly": 1
+      }
+    }
+  },
+  "observatory": {
+      "subjectSelector": ["proxy"],
+      "probeURL": "https://gstatic.om/generate_204",
+      "probeInterval": "12s"
+  },
+  "outbounds": [
+        {
+            "protocol": "freedom",
+            "tag": "direct"
+	    },
+        {
+            "protocol": "blackhole",
+            "tag": "block"
+        }
+  ],
+  "inbounds": [
+      {
+          "protocol": "http",
+          "tag": "http-in",
+          "listen": "127.0.0.1", 
+          "port": 2081,
+          "sniffing": {
+              "enabled": true,
+              "destOverride": [
+                  "http",
+                  "tls",
+                  "quic"
+              ],
+              "routeOnly": true
+          }
+      },
+      {
+          "protocol": "socks",
+          "tag": "socks-in",
+          "listen": "127.0.0.1", 
+          "port": 2080,
+          "settings": {
+              "ip": "127.0.0.1",
+              "udp": true
+          },
+          "sniffing": {
+              "enabled": true,
+              "destOverride": [
+                  "http",
+                  "tls",
+                  "quic"
+              ],
+              "routeOnly": true
+          }
+      }
+  ],
+  "routing": {
+    "domainStrategy": "IPOnDemand",
+    "balancers": [
+      {
+        "tag": "balancer-all",
+        "selector": ["proxy"],
+        "strategy": {
+          "type": "leastPing"
+        }
+      }
+    ],
+    "rules": [
+      {
+        "domain": [
+          "domain:reddit.com"
+        ],
+        "outboundTag": "direct",
+        "type": "field"
+      },
+      {
+        "ip": [
+          "geoip:ru"
+        ],
+        "outboundTag": "direct",
+        "type": "field"
+      },
+      {
+        "domain": [
+          "geosite:private"
+        ],
+        "outboundTag": "direct",
+        "type": "field"
+      },
+      {
+        "inboundTag": [
+          "dns-module"
+        ],
+        "outboundTag": "proxy",
+        "type": "field"
+      }
+    ]
+  }
+}
