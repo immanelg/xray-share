@@ -1,7 +1,4 @@
 * -i -
 * -o -
-* test and filter invalid configs
-    -T -i config.json -o config.json -test-url gstatic.com/generate_204
-    -T -i sub.txt -o sub.txt -test-url gstatic.com/generate_204
 * autoupdate (can be easily implemented with user cron xray-sharetool -U -i https://...)
 * autotest configs (cron for -U -T ?)

@@ -6,33 +6,34 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"runtime"
+	"strconv"
 
-	// "crypto/rand"
 	"encoding/json"
 	"flag"
 	"strings"
 
+	"github.com/xtls/libxray/nodep"
 	"github.com/xtls/libxray/share"
 	"github.com/xtls/libxray/xray"
 
 	"github.com/xtls/xray-core/infra/conf"
-	confJSON "github.com/xtls/xray-core/infra/conf/json"
+	confjson "github.com/xtls/xray-core/infra/conf/json"
 )
 
-const version = "<devel>"
-const commitHash = "<unknown commit>"
+var version = "<devel>"
+var commitHash = "<unknown commit>"
 
 func todo() {
 	fmt.Fprintf(os.Stderr, "unimplemented!\n")
 }
 func die(message string) {
-	fmt.Fprintf(os.Stderr, "%s\n", message)
+	fmt.Fprintf(os.Stderr, ansi("@R{%s}\n"), message)
+	os.Exit(1)
 }
 func assertSuccess(message string, err error) {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s: %v", message, err)
+		fmt.Fprintf(os.Stderr, ansi("@R{%s: %v}\n"), message, err)
 		os.Exit(1)
 	}
 }
@@ -78,32 +79,32 @@ func main() {
 	var testUrl string
 	var testFiltersBelowTimeout int64
 	var testFiltersAboveTimeout int64
-	flag.StringVar(&inFile, "i", "", "in file")
-	flag.StringVar(&outFile, "o", "", "out file")
-	flag.StringVar(&testUrl, "turl", "https://gstatic.com/generate_204", "test max timeout")
-	flag.Int64Var(&testFiltersAboveTimeout, "tmax", 5000, "test max timeout")
-	flag.Int64Var(&testFiltersBelowTimeout, "tmin", 100, "test min timeout")
+	flag.StringVar(&inFile, "i", "", "")
+	flag.StringVar(&outFile, "o", "", "")
+	flag.StringVar(&testUrl, "turl", "https://gstatic.com/generate_204", "")
+	flag.Int64Var(&testFiltersAboveTimeout, "tmax", 5000, "")
+	flag.Int64Var(&testFiltersBelowTimeout, "tmin", 100, "")
 
 	flag.Usage = func() {
 		w := flag.CommandLine.Output()
 
-		me := filepath.Base(os.Args[0])
-		fmt.Fprintf(w, "Commands:\n")
-		fmt.Fprintf(w, "%s -V\n", me)
-		fmt.Fprintf(w, "\tPrint version.\n")
-		fmt.Fprintf(w, "%s -U -i URL_SUBS [-o FILEPATH_JSON=generated-config.json]\n", me)
-		fmt.Fprintf(w, "\tConvert share links to json config.\n")
-		fmt.Fprintf(w, "%s -C -i URL_JSON [-o FILEPATH_SUBS=generated-links.txt]\n", me)
-		fmt.Fprintf(w, "\tConvert json config to share links.\n")
-		fmt.Fprintf(w, "%s -T [-tmax MS] [-tmin MS] [-turl URL] -i URL_JSON [-o FILEPATH_JSON=generated-config.json]\n", me)
-		fmt.Fprintf(w, "\tFilter good configs.\n")
+		fmt.Fprint(w, ansi(
+`@Y{-V}
+  Print version info
+@Y{-U -i URL_SUBS [-o FILEPATH_JSON=generated-config.json]}
+  Convert share links to json config
+@Y{-C -i URL_JSON [-o FILEPATH_SUBS=generated-links.txt]}
+  Convert json config to share links
+@Y{-T [-tmax MS] [-tmin MS] [-turl URL=https://gstatic.com/generate_204] -i URL_JSON_OR_SUBS [-o FILEPATH_JSON=generated-config.json]}
+  Filter good configs
+`))
 	}
 
 	flag.Parse()
 
 	switch {
 	case printVersion:
-		fmt.Println("xray-sharetool", version, commitHash, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+		fmt.Printf("%s %s %s %s %s %s\n", os.Args[0], version, commitHash, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 		os.Exit(0)
 	case urlToConfig:
 		if inFile == "" { die("no input file") }
@@ -128,17 +129,35 @@ func main() {
 		mustWriteEntireFile(outFile, []byte(links))
 
 	case testConfigs:
-		// TODO hm. input can be both formats: sub.txt or sub.json from remote host / local file
 		if inFile == "" { die("no input file") }
 
 		configString := string(mustReadEntireFile(inFile))
 
-		type pingOutboundConfig struct {
-			Outbounds []conf.OutboundDetourConfig `json:"outbounds"`
+		{
+			var c struct { Outbounds []json.RawMessage `json:"outbounds"` }
+			if nil != json.NewDecoder(&confjson.Reader{Reader: strings.NewReader(configString)}).Decode(&c) {
+				rawMsg, errConv := share.ConvertShareLinksToXrayJson(configString, "")
+			    assertSuccess("convert share links to json", errConv)
+				configBytes, errJson := json.Marshal(rawMsg)
+			    assertSuccess("marshal json", errJson)
+				configString = string(configBytes)
+			}
 		}
+
+		// NOTE: This is the config we will use internally for accessing fields.
+		// ...
+		type pingOutboundConfig struct { Outbounds []conf.OutboundDetourConfig `json:"outbounds"` }
 		var config pingOutboundConfig
-		decoder := json.NewDecoder(&confJSON.Reader{Reader: strings.NewReader(configString)})
-		assertSuccess("decode config", decoder.Decode(&config))
+		assertSuccess("decode config", 
+			json.NewDecoder(&confjson.Reader{Reader: strings.NewReader(configString)}).Decode(&config))
+
+		// ...
+		// NOTE: This is the config we will use to write output JSON. keep the message as-is, don't 
+		// generate a bunch of garbage nulls (because Marshal will generate garbage)
+		type pingOutboundConfigRaw struct { Outbounds []json.RawMessage `json:"outbounds"` }
+		var configRaw pingOutboundConfigRaw
+		assertSuccess("decode raw config", 
+			json.NewDecoder(&confjson.Reader{Reader: strings.NewReader(configString)}).Decode(&configRaw))
 
 		pingItems := []xray.PingBatchItem{}
 		for _, outbound := range config.Outbounds {
@@ -147,21 +166,36 @@ func main() {
 				OutboundTag: outbound.Tag,
 			})
 		}
-		pingResults, errPing := xray.PingBatch(pingItems, int(testFiltersAboveTimeout/1000), testUrl)
-		assertSuccess("cannot ping batch", errPing)
-		var configGood pingOutboundConfig
+
+		pingResults := []xray.PingBatchResult{}
+
+		const BATCH = 5
+		for start := 0; start < len(pingItems); start += BATCH {
+			end := min(start+BATCH, len(pingItems))
+			batchOfPingItems := pingItems[start:end]
+			batchOfPingResults, errPing := xray.PingBatch(batchOfPingItems, int(testFiltersAboveTimeout/1000), testUrl)
+			assertSuccess("cannot ping batch", errPing)
+			pingResults = append(pingResults, batchOfPingResults...)
+		}
+
+		var configGood pingOutboundConfigRaw
 		for i, pingResult := range pingResults {
-			outbound := config.Outbounds[i]
-			fmt.Printf(">>> testing %s\n", outbound.Tag)
+			fmt.Printf("Tag: %s\n", config.Outbounds[i].Tag)
+
+			var delayString string
+			switch pingResult.Delay {
+			case nodep.PingDelayError:   delayString = "(error)"
+			case nodep.PingDelayTimeout: delayString = "(timeout)"
+			default:                     delayString = strconv.FormatInt(pingResult.Delay, 10)+"ms"
+			}
+
 			if pingResult.Success && 
 			   pingResult.Delay < testFiltersAboveTimeout && 
 			   pingResult.Delay > testFiltersBelowTimeout {
-				fmt.Printf("GOOD\n")
-				configGood.Outbounds = append(configGood.Outbounds, outbound)
+			   fmt.Printf(ansi("@G{Verdict: GOOD\nDelay: %v}\n\n"), delayString)
+				configGood.Outbounds = append(configGood.Outbounds, configRaw.Outbounds[i])
 			} else {
-				fmt.Printf("BAD\n")
-				fmt.Printf("Delay: %v\n", pingResult.Delay)
-				fmt.Printf("Error: %v\n", pingResult.Error)
+				fmt.Printf(ansi("@R{Verdict: BAD\nDelay: %v\nError: %v}\n\n"), delayString, pingResult.Error)
 			}
 		}
 		configGoodBytes, _ := json.MarshalIndent(configGood, "", "    ")

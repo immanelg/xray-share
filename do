@@ -1,13 +1,16 @@
 #!/usr/bin/bash
 set -eo pipefail
 
-BIN=xray-sharetool
+BIN=xray-share
 
 DEFAULT=build
 @build() {
     # TODO: x build
-    # TODO: x build
-    go build -o $BIN
+    CGO_ENABLED=0 \
+        go build \
+        -trimpath \
+        -ldflags "-s -w -X main.version=$(git describe --tags --always) -X main.commitHash=$(git rev-parse --short HEAD)"  \
+        -o "$BIN"
 }
 
 @watch() {
@@ -16,6 +19,17 @@ DEFAULT=build
 
 @github_release() {
     todo
+}
+
+PREFIX=$HOME/.local
+BINDIR=$PREFIX/bin
+
+@install() {
+    @build && cp -f "$BIN" "$BINDIR"
+}
+
+@uninstall() {
+    rm -f "$BINDIR/$BIN"
 }
 
 @run() {
