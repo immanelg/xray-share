@@ -1,8 +1,11 @@
-module xray-shareurl
+module xray-share
 
 go 1.27.3
 
-require github.com/xtls/libxray v1.261109.0
+require (
+	github.com/xtls/libxray v1.261109.0
+	github.com/xtls/xray-core v1.260327.1-0.20261109052709-676eaf66f8f0
+)
 
 require (
 	github.com/apernet/quic-go v0.63.1-0.20261004180939-a10df75c260c // indirect
@@ -38,7 +41,6 @@ require (
 	github.com/vishvananda/netns v0.0.5 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/xtls/reality v0.0.0-20261108101329-4bb46b2afd8b // indirect
-	github.com/xtls/xray-core v1.260327.1-0.20261109052709-676eaf66f8f0 // indirect
 	github.com/yuin/gopher-lua v1.1.2 // indirect
 	go4.org/netipx v0.0.0-20260823151212-3075585bcbeb // indirect
 	golang.org/x/crypto v0.58.0 // indirect
