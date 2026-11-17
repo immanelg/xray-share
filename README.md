@@ -9,11 +9,11 @@ Based on 'official' libXray.
 
 ```sh
 export SUB=https://raw.githubusercontent.com/free-nodes/v2rayfree/main/sub
-xray-share -T -i $SUB -o free-nodes.json -tmax 3000 -turl https://google.com 
+xray-share -T -i $SUB -o free-nodes.json
 ```
 The `-T` command: 
-- tests configs from `-i` file (in this case, remote url)
-- writes good configs (xray json) to `-o` file.
+- tests configs from `-i` file (in this case, remote url with share links)
+- writes good configs to `-o` file (xray outbounds json)
 
 Now you can run xray:
 ```sh
