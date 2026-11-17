@@ -190,9 +190,9 @@ func main() {
 			}
 
 			if pingResult.Success && 
-			   pingResult.Delay < testFiltersAboveTimeout && 
-			   pingResult.Delay > testFiltersBelowTimeout {
-			   fmt.Printf(ansi("@G{Verdict: GOOD\nDelay: %v}\n\n"), delayString)
+			pingResult.Delay < testFiltersAboveTimeout && 
+			pingResult.Delay > testFiltersBelowTimeout {
+				fmt.Printf(ansi("@G{Verdict: GOOD\nDelay: %v}\n\n"), delayString)
 				configGood.Outbounds = append(configGood.Outbounds, configRaw.Outbounds[i])
 			} else {
 				fmt.Printf(ansi("@R{Verdict: BAD\nDelay: %v\nError: %v}\n\n"), delayString, pingResult.Error)
