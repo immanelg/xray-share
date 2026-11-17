@@ -22,7 +22,7 @@ cp base.json config/   # this is your own base config that includes inbounds, ru
 xray -confdir config/
 ```
 
-See [./xray-rotator](example script).
+See [example script](./xray-rotator).
 
 # Commands
 ```sh
