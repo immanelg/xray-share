@@ -6,6 +6,7 @@ BIN=xray-share
 DEFAULT=build
 @build() {
     # TODO: x build
+
     CGO_ENABLED=0 \
         go build \
         -trimpath \
@@ -48,10 +49,10 @@ todo() {
 
 ##################################################################
 @help() {
-    echo "do™️: Control this project."
+    echo "do™️: Control this project. This file is a simple, self-contained bash script."
     echo 
     echo "Available commands:"
-    declare -F | grep "^declare -f @" | cut -f 2 -d @ | sed "s|^|\t$0 |"
+    declare -F | grep "^declare -f @" | cut -f 2 -d @ | sed "s|^|   -> $0 |"
 }
 if [[ -z $1 ]]; then
     # this has alphabetical sorting, so this doesnt work.

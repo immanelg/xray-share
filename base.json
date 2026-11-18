@@ -13,36 +13,21 @@
     }
   },
   "observatory": {
-      "subjectSelector": ["proxy"],
-      "probeURL": "https://gstatic.om/generate_204",
+      "subjectSelector": ["proxy-"],
+      "probeURL": "https://google.com",
       "probeInterval": "12s"
   },
   "outbounds": [
-        {
-            "protocol": "freedom",
-            "tag": "direct"
-	    },
-        {
-            "protocol": "blackhole",
-            "tag": "block"
-        }
+      {
+          "protocol": "blackhole",
+          "tag": "block"
+      },
+      {
+          "protocol": "freedom",
+          "tag": "direct"
+      }
   ],
   "inbounds": [
-      {
-          "protocol": "http",
-          "tag": "http-in",
-          "listen": "127.0.0.1", 
-          "port": 2081,
-          "sniffing": {
-              "enabled": true,
-              "destOverride": [
-                  "http",
-                  "tls",
-                  "quic"
-              ],
-              "routeOnly": true
-          }
-      },
       {
           "protocol": "socks",
           "tag": "socks-in",
@@ -61,6 +46,21 @@
               ],
               "routeOnly": true
           }
+      },
+      {
+          "protocol": "http",
+          "tag": "http-in",
+          "listen": "127.0.0.1", 
+          "port": 2081,
+          "sniffing": {
+              "enabled": true,
+              "destOverride": [
+                  "http",
+                  "tls",
+                  "quic"
+              ],
+              "routeOnly": true
+          }
       }
   ],
   "routing": {
@@ -68,13 +68,21 @@
     "balancers": [
       {
         "tag": "balancer-all",
-        "selector": ["proxy"],
+        "selector": ["proxy-"],
         "strategy": {
           "type": "leastPing"
-        }
+        },
+        "fallbackTag": "block"
       }
     ],
     "rules": [
+        {
+            "type": "field",
+            "domain": [
+                "geosite:category-ads-all"
+            ],
+            "outboundTag": "block"
+        },
       {
         "domain": [
           "domain:reddit.com"
@@ -97,11 +105,19 @@
         "type": "field"
       },
       {
-        "inboundTag": [
-          "dns-module"
-        ],
-        "outboundTag": "proxy",
-        "type": "field"
+          "type": "field",
+          "inboundTag": [
+              "dns-module"
+          ],
+          "balancerTag": "balancer-all"
+      },
+      {
+          "type": "field",
+          "inboundTag": [
+              "socks-in",
+              "http-in"
+          ],
+          "balancerTag": "balancer-all"
       }
     ]
   }

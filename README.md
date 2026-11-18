@@ -28,11 +28,11 @@ See [example script](./xray-rotator).
 ```sh
 -V
   Print version info
--U -i URL_SUBS [-o FILEPATH_JSON=generated-config.json]
+-U -i URL_SUBS [-o FILEPATH_JSON=generated-config.json] [-uniqtags]
   Convert share links to json config
 -C -i URL_JSON [-o FILEPATH_SUBS=generated-links.txt]
   Convert json config to share links
--T [-tmax MS] [-tmin MS] [-turl URL=https://gstatic.com/generate_204] -i URL_JSON_OR_SUBS [-o FILEPATH_JSON=generated-config.json]
+-T [-tmax MS] [-tmin MS] [-turl URL=https://gstatic.com/generate_204] -i URL_JSON_OR_SUBS [-o FILEPATH_JSON=generated-config.json] [-uniqtags]
   Filter good configs
 ```
 
