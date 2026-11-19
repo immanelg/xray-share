@@ -21,7 +21,7 @@ import (
 	"github.com/xtls/libxray/share"
 	"github.com/xtls/libxray/xray"
 
-	"github.com/xtls/xray-core/infra/conf"
+	// "github.com/xtls/xray-core/infra/conf"
 	confjson "github.com/xtls/xray-core/infra/conf/json"
 )
 
@@ -108,7 +108,7 @@ func main() {
 	// parameters
 	var inFile string
 	var outFile string
-	var normalizeTags bool = true; _ = normalizeTags
+	var normalizeTags bool = true // XXX: configs from retarded sources have duplicate tags, which is a problem for xray. this flag controls our dumb substitution for tags.
 	var testUrl string
 	var testFiltersBelowTimeout int64
 	var testFiltersAboveTimeout int64
@@ -144,7 +144,6 @@ func main() {
 		if inFile == "" { die("no input file") }
 		links := mustReadEntireFile(inFile)
 
-		// FIXME: configs from retarded sources **have duplicate tags**, which is a problem for xray.
 		// FIXME: Additionally, produced config isn't useful because Observatory selector wants you
 		// to **have a common prefix** like `proxy-` for rotating configs. 
 		// How do we edit this without shitting nulls into this json? 
@@ -170,7 +169,11 @@ func main() {
 
 		// we want json input file. if it's not, try to normalize it first by converting from share links.
 		{
-			if nil != json.NewDecoder(&confjson.Reader{Reader: strings.NewReader(string(configIn))}).Decode(&struct { Outbounds []json.RawMessage `json:"outbounds"` }{}) {
+			if nil != json.NewDecoder(
+				&confjson.Reader{ Reader: strings.NewReader(string(configIn))},
+			).Decode(
+				&struct{Outbounds []json.RawMessage `json:"outbounds"`}{},
+			) {
 				var errJson error
 				configIn, errJson = json.Marshal(subToJson(configIn, normalizeTags))
 			    assertSuccess("marshal json", errJson)
@@ -178,29 +181,28 @@ func main() {
 		}
 		configString := string(configIn)
 
-		// NOTE: This is the config we will use internally for accessing fields.
-		// ...
-		type pingOutboundConfig struct { Outbounds []conf.OutboundDetourConfig `json:"outbounds"` }
-		var config pingOutboundConfig
-		assertSuccess("decode config", 
-			json.NewDecoder(&confjson.Reader{Reader: strings.NewReader(configString)}).Decode(&config))
-
-		// ...
-		// NOTE: This is the config we will use to write output JSON. keep the message as-is, don't 
-		// generate a bunch of garbage nulls (because Marshal will generate garbage)
-		type pingOutboundConfigRaw struct { 
+		// NOTE: This is the config we will use to write output JSON. keep the message as-is.
+		// if we use Outbounds []OutboundDetour something something,
+		// if generate a bunch of garbage nulls (because xray doesnt put omitempty)
+		type configOut struct { 
 			Outbounds []json.RawMessage `json:"outbounds,omitempty"` 
 		}
-		var configRaw pingOutboundConfigRaw
+		var config configOut
 		assertSuccess("decode raw config", 
-			json.NewDecoder(&confjson.Reader{Reader: strings.NewReader(configString)}).Decode(&configRaw))
+			json.NewDecoder(&confjson.Reader{Reader: strings.NewReader(configString)}).Decode(&config))
+
+		var tags []string
+		for _, outbound := range config.Outbounds {
+			var t struct{ Tag string `json:"tag"` }
+			json.Unmarshal(outbound, &t)
+			tags = append(tags, t.Tag)
+		}
 
 		pingItems := []xray.PingBatchItem{}
-		for _, outbound := range config.Outbounds {
+		for i := range config.Outbounds {
 			pingItems = append(pingItems, xray.PingBatchItem{
 				XrayJSON: configString,
-				OutboundTag: outbound.Tag,
-				// FIXME: configs from retarded sources have duplicate tags, which this thing obviously rejects. 
+				OutboundTag: tags[i],
 			})
 		}
 
@@ -215,10 +217,9 @@ func main() {
 			pingResults = append(pingResults, batchOfPingResults...)
 		}
 
-		var configGood pingOutboundConfigRaw
-		type outbound struct{o json.RawMessage; d int64}; outbounds := []outbound{}
+		type outbound struct{o json.RawMessage; d int64}; goodOutbounds := []outbound{}
 		for i, pingResult := range pingResults {
-			fmt.Printf("Tag: %s\n", config.Outbounds[i].Tag)
+			fmt.Printf("Tag: %s\n", tags[i])
 
 			var delayString string
 			switch pingResult.Delay {
@@ -231,14 +232,14 @@ func main() {
 			pingResult.Delay < testFiltersAboveTimeout && 
 			pingResult.Delay > testFiltersBelowTimeout {
 				fmt.Printf(ansi("@G{Verdict: GOOD\nDelay: %v}\n\n"), delayString)
-				outbounds = append(outbounds, outbound{configRaw.Outbounds[i], pingResult.Delay})
-				configGood.Outbounds = append(configGood.Outbounds, configRaw.Outbounds[i])
+				goodOutbounds = append(goodOutbounds, outbound{config.Outbounds[i], pingResult.Delay})
 			} else {
 				fmt.Printf(ansi("@R{Verdict: BAD\nDelay: %v\nError: %v}\n\n"), delayString, pingResult.Error)
 			}
 		}
-		sort.SliceStable(outbounds, func(i, j int) bool { return outbounds[i].d < outbounds[j].d })
-		for _, outbound := range outbounds { configRaw.Outbounds = append(configRaw.Outbounds, outbound.o) } 
+		sort.Slice(goodOutbounds, func(i, j int) bool { return goodOutbounds[i].d < goodOutbounds[j].d })
+		var configGood configOut
+		for _, outbound := range goodOutbounds { configGood.Outbounds = append(configGood.Outbounds, outbound.o) } 
 		configGoodBytes, _ := json.MarshalIndent(configGood, "", "    ")
 		if outFile == "" { outFile = "generated-config.json" }
 		mustWriteEntireFile(outFile, configGoodBytes)

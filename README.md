@@ -3,10 +3,14 @@ Command to convert xray config <-> share url (like vless://*).
 Based on 'official' libXray.
 
 # Quickstart
+## Install
 ```sh
 ./do install
+xray-share -V
 ```
+See `./do help`.
 
+## Example: fetch configs from a profile, filter them by speed, convert to JSON and run Xray-core
 ```sh
 export SUB=https://raw.githubusercontent.com/free-nodes/v2rayfree/main/sub
 xray-share -T -i $SUB -o free-nodes.json
@@ -21,8 +25,6 @@ cp free-nodes.json config/
 cp base.json config/   # this is your own base config that includes inbounds, rules, dns, observatory, ...
 xray -confdir config/
 ```
-
-See [example script](./xray-rotator).
 
 # Commands
 ```sh
