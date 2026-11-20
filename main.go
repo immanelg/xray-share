@@ -48,8 +48,9 @@ func logIfError(message string, err error) {
 }
 
 func mustReadEntireFile(name string) []byte {
+	log.Printf("reading %s", name)
 	if name == "-" {
-		log.Print("reading stdin...\n")
+		log.Print("waiting for stdin...\n")
 		content, errReadStdin := io.ReadAll(os.Stdin)
 		mustOk("read stdin", errReadStdin)
 		return content
@@ -71,6 +72,7 @@ func mustReadEntireFile(name string) []byte {
 }
 
 func mustWriteEntireFile(name string, content []byte) {
+	log.Printf("writing %s", name)
 	if name == "-" {
 		fmt.Print(string(content))
 		return
@@ -83,6 +85,7 @@ func mustWriteEntireFile(name string, content []byte) {
 	mustOk("write", errWrite)
 }
 
+var gTagCounter int
 func subToJson(links []byte, normalizeTags bool) json.RawMessage {
 	cfgjson, errconv := share.ConvertShareLinksToXrayJson(string(links), "")
 	mustOk("convert", errconv)
@@ -91,14 +94,12 @@ func subToJson(links []byte, normalizeTags bool) json.RawMessage {
 	mustOk("marshal", errjson)
 
 	if normalizeTags {
-		counter := 0
 		re := regexp.MustCompile(`"tag":\s*"([^"]*)"`)
 		cfg = re.ReplaceAllFunc(cfg, func(tag []byte) []byte {
-			counter += 1
-			return []byte(fmt.Sprintf(`"tag": "proxy-#%d-%s-%s"`, counter, rand.Text(), re.FindSubmatch(tag)[1]))
+			gTagCounter++
+			return []byte(fmt.Sprintf(`"tag": "proxy-#%d-%s-%s"`, gTagCounter, rand.Text(), re.FindSubmatch(tag)[1]))
 		})
 	}
-
 
 	return cfg
 }
@@ -132,14 +133,14 @@ func main() {
 		w := flag.CommandLine.Output()
 
 		fmt.Fprint(w, fmtcolor(
-`@Y{-V}
-  Print version info
-@Y{-U [-i URL_SUBS=-] [-o FILEPATH_JSON=-] [-uniqtags]}
-  Convert share links to json config
-@Y{-C [-i URL_JSON=-] [-o FILEPATH_SUBS=-]}
-  Convert json config to share links
-@Y{-T [-tmax MS] [-tmin MS] [-turl URL=https://gstatic.com/generate_204] [-i URL_JSON_OR_SUBS=-] [-o FILEPATH_JSON=-] [-uniqtags]}
-  Filter good configs
+`@Y{xray-share -V}
+  @g{Print version info}
+@Y{xray-share -U [-i URL_SUBS=-] [-o FILEPATH_JSON=-] [-uniqtags]}
+  @g{Convert share links to json config}
+@Y{xray-share -C [-i URL_JSON=-] [-o FILEPATH_SUBS=-]}
+  @g{Convert json config to share links}
+@Y{xray-share -T [-tmax MS] [-tmin MS] [-turl URL=https://gstatic.com/generate_204] [-i URL_JSON_OR_SUBS=-] [-o FILEPATH_JSON=-] [-uniqtags]}
+  @g{Filter working configs and output json}
 `))
 	}
 
@@ -147,7 +148,7 @@ func main() {
 
 	switch {
 	case printVersion:
-		fmt.Printf("%s %s %s %s %s %s\n", os.Args[0], version, commitHash, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+		fmt.Printf(fmtcolor("@G{%s} @g{%s %s %s %s %s}\n"), os.Args[0], version, commitHash, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 		os.Exit(0)
 	case urlToConfig:
 		links := mustReadEntireFile(inFile)
@@ -219,7 +220,7 @@ func main() {
 			batchOfPingResults, errPing := xray.PingBatch(batchOfPingItems, max(1, int(testFiltersAboveTimeout/1000)), testUrl)
 			if errPing != nil {
 				batchOfPingResults = make([]xray.PingBatchResult, len(batchOfPingItems))
-				// NOTE: len(pingResults) stays in sync with tags.
+				// NOTE: len(pingResults) stays in sync with len(tags).
 			}
 			logIfError("ping batch", errPing)
 			pingResults = append(pingResults, batchOfPingResults...)
@@ -251,7 +252,7 @@ func main() {
 		configGoodBytes, _ := json.MarshalIndent(configGood, "", "    ")
 		mustWriteEntireFile(outFile, configGoodBytes)
 	default:
-		fmt.Printf("one of commands must be specified\n")
+		fmt.Print(fmtcolor("@R{one of commands must be specified}\n"))
 		flag.Usage()
 	}
 }

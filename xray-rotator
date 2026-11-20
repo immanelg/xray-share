@@ -1,11 +1,34 @@
 #!/bin/sh
 
-OPTS='-tmax 3000 -turl https://google.com'
+ARGS='-T -tmax 3000 -turl https://google.com'
 mkdir -p confs
 while :; do 
     rm -f confs/*
     cp base.json confs
-    xray-share -T $OPTS -i https://raw.githubusercontent.com/free-nodes/v2rayfree/main/sub -o free-nodes.json  
-    xray -confdir confs
-    sleep 1h
+    cd confs
+    set -x
+    # xray-share -U -o 01.txt -i https://github.com/igareck/vpn-configs-for-russia/raw/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt
+    # xray-share -U -o 02.txt -i https://github.com/igareck/vpn-configs-for-russia/raw/refs/heads/main/WHITE-CIDR-RU-checked.txt
+    # xray-share -U -o 03.txt -i https://github.com/igareck/vpn-configs-for-russia/raw/refs/heads/main/WHITE-CIDR-RU-all.txt
+    # xray-share -U -o 04.txt -i https://github.com/igareck/vpn-configs-for-russia/raw/refs/heads/main/BLACK_SS+All_RUS.txt
+    # xray-share -U -o 05.txt -i https://github.com/igareck/vpn-configs-for-russia/raw/refs/heads/main/BLACK_SS_WEAK_DPI_RUS.txt
+    # xray-share -U -o 06.txt -i https://github.com/igareck/vpn-configs-for-russia/raw/refs/heads/main/BLACK_VLESS_RUS_mobile.txt
+    # xray-share -U -o 07.txt -i https://github.com/igareck/vpn-configs-for-russia/raw/refs/heads/main/BLACK_VLESS_RUS.txt
+    # xray-share -U -o 08.txt -i https://github.com/free-nodes/v2rayfree/raw/refs/heads/main/sub
+    # xray-share -U -o 09.txt -i https://github.com/free-nodes/v2rayfree/raw/refs/heads/main/v20261117
+    # xray-share -U -o 10.txt -i https://github.com/free-nodes/v2rayfree/raw/refs/heads/main/v20261118
+    # xray-share -U -o 11.txt -i https://github.com/free-nodes/v2rayfree/raw/refs/heads/main/v20261116
+    xray-share $ARGS -o 01.json -i https://github.com/igareck/vpn-configs-for-russia/raw/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt
+    xray-share $ARGS -o 02.json -i https://github.com/igareck/vpn-configs-for-russia/raw/refs/heads/main/WHITE-CIDR-RU-checked.txt
+    xray-share $ARGS -o 03.json -i https://github.com/igareck/vpn-configs-for-russia/raw/refs/heads/main/WHITE-CIDR-RU-all.txt
+    xray-share $ARGS -o 04.json -i https://github.com/igareck/vpn-configs-for-russia/raw/refs/heads/main/BLACK_SS+All_RUS.txt
+    xray-share $ARGS -o 05.json -i https://github.com/igareck/vpn-configs-for-russia/raw/refs/heads/main/BLACK_SS_WEAK_DPI_RUS.txt
+    xray-share $ARGS -o 06.json -i https://github.com/igareck/vpn-configs-for-russia/raw/refs/heads/main/BLACK_VLESS_RUS_mobile.txt
+    xray-share $ARGS -o 07.json -i https://github.com/igareck/vpn-configs-for-russia/raw/refs/heads/main/BLACK_VLESS_RUS.txt
+    xray-share $ARGS -o 08.json -i https://github.com/free-nodes/v2rayfree/raw/refs/heads/main/sub
+    xray-share $ARGS -o 09.json -i https://github.com/free-nodes/v2rayfree/raw/refs/heads/main/v20261117
+    xray-share $ARGS -o 10.json -i https://github.com/free-nodes/v2rayfree/raw/refs/heads/main/v20261118
+    xray-share $ARGS -o 11.json -i https://github.com/free-nodes/v2rayfree/raw/refs/heads/main/v20261116
+    set +x
+    sleep 1m
 done
