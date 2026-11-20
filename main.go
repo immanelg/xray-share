@@ -110,10 +110,10 @@ func main() {
 	var configToUrl bool
 	var urlToConfig bool
 	var testConfigs bool
-	flag.BoolVar(&printVersion, "V", false, "version")
-	flag.BoolVar(&configToUrl, "C", false, "config to url")
-	flag.BoolVar(&urlToConfig, "U", false, "urls to config")
-	flag.BoolVar(&testConfigs, "T", false, "filter out bad configs")
+	flag.BoolVar(&printVersion, "V", false, "")
+	flag.BoolVar(&configToUrl, "C", false, "")
+	flag.BoolVar(&urlToConfig, "U", false, "")
+	flag.BoolVar(&testConfigs, "T", false, "")
 
 	// parameters
 	var inFile string
@@ -126,25 +126,43 @@ func main() {
 	flag.StringVar(&outFile, "o", "-", "")
 	flag.BoolVar(&normalizeTags, "uniqtags", true, "")
 	flag.StringVar(&testUrl, "turl", "https://gstatic.com/generate_204", "")
-	flag.Int64Var(&testFiltersAboveTimeout, "tmax", 5000, "")
+	flag.Int64Var(&testFiltersAboveTimeout, "tmax", 3000, "")
 	flag.Int64Var(&testFiltersBelowTimeout, "tmin", 100, "")
 
 	flag.Usage = func() {
 		w := flag.CommandLine.Output()
 
 		fmt.Fprint(w, fmtcolor(
-`@Y{xray-share -V}
-  @g{Print version info}
-@Y{xray-share -U [-i URL_SUBS=-] [-o FILEPATH_JSON=-] [-uniqtags]}
-  @g{Convert share links to json config}
-@Y{xray-share -C [-i URL_JSON=-] [-o FILEPATH_SUBS=-]}
-  @g{Convert json config to share links}
-@Y{xray-share -T [-tmax MS] [-tmin MS] [-turl URL=https://gstatic.com/generate_204] [-i URL_JSON_OR_SUBS=-] [-o FILEPATH_JSON=-] [-uniqtags]}
-  @g{Filter working configs and output json}
+`@g{Usage:}
+  @Y{xray-share -V}
+    @g{Print version info}
+  @Y{xray-share -U [-i URL_SUBS=-] [-o FILEPATH_JSON=-] [-uniqtags]}
+    @g{Convert share links to json config}
+  @Y{xray-share -C [-i URL_JSON=-] [-o FILEPATH_SUBS=-]}
+    @g{Convert json config to share links}
+  @Y{xray-share -T [-tmax MS] [-tmin MS] [-turl URL=https://gstatic.com/generate_204] [-i URL_JSON_OR_SUBS=-] [-o FILEPATH_JSON=-] [-uniqtags]}
+    @g{Filter working configs (json OR share links) and output json}
 `))
+
+		os.Exit(1)
 	}
 
 	flag.Parse()
+
+	if len(flag.Args()) > 0 {
+		fmt.Print(fmtcolor("@R{trailing arguments}\n"))
+		flag.Usage()
+	}
+
+	c := 0
+	if printVersion { c++ }
+	if urlToConfig { c++ }
+	if configToUrl { c++ }
+	if testConfigs { c++ }
+	if c != 1 {
+		fmt.Printf(fmtcolor("@R{exactly one of commands must be specified, but %d were provided}\n\n"), c)
+		flag.Usage()
+	}
 
 	switch {
 	case printVersion:
@@ -251,8 +269,5 @@ func main() {
 		for _, outbound := range goodOutbounds { configGood.Outbounds = append(configGood.Outbounds, outbound.o) } 
 		configGoodBytes, _ := json.MarshalIndent(configGood, "", "    ")
 		mustWriteEntireFile(outFile, configGoodBytes)
-	default:
-		fmt.Print(fmtcolor("@R{one of commands must be specified}\n"))
-		flag.Usage()
 	}
 }
