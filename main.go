@@ -4,12 +4,14 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"regexp"
 	"runtime"
 	"strconv"
+	"time"
 
 	"sort"
 
@@ -29,57 +31,64 @@ var version = "<devel>"
 var commitHash = "<unknown commit>"
 
 func todo() {
-	fmt.Fprintf(os.Stderr, "unimplemented!\n")
+	log.Fatal("unimplemented!\n")
 }
 func die(message string) {
-	fmt.Fprintf(os.Stderr, ansi("@R{%s}\n"), message)
-	os.Exit(1)
+	log.Fatalf(fmtcolor("@R{%s}\n"), message)
 }
-func assertSuccess(message string, err error) {
+func mustOk(message string, err error) {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, ansi("@R{%s: %v}\n"), message, err)
-		os.Exit(1)
+		log.Fatalf(fmtcolor("@R{%s: %v}\n"), message, err)
 	}
 }
-func softAssertSuccess(message string, err error) {
+func logIfError(message string, err error) {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, ansi("@R{%s: %v}\n"), message, err)
+		log.Fatalf(fmtcolor("@R{%s: %v}\n"), message, err)
 	}
 }
 
 func mustReadEntireFile(name string) []byte {
+	if name == "-" {
+		log.Print("reading stdin...\n")
+		content, errReadStdin := io.ReadAll(os.Stdin)
+		mustOk("read stdin", errReadStdin)
+		return content
+	}
 	path, errParseUrl := url.Parse(name)
-	assertSuccess("parse file url", errParseUrl)
+	mustOk("parse file url", errParseUrl)
 	
 	if path.Scheme == "" {
 		content, errReadIn := os.ReadFile(name)
-		assertSuccess("read input file", errReadIn)
+		mustOk("read input file", errReadIn)
 		return content
 	}
-	hclient := http.DefaultClient
-	response, errReadIn := hclient.Get(name)
-	assertSuccess("read remote file", errReadIn)
+	httpClient := &http.Client{Timeout: 10*time.Second}
+	response, errHttp := httpClient.Get(name)
+	mustOk("read remote file", errHttp)
 	defer response.Body.Close()
 	body, _ := io.ReadAll(response.Body)
 	return body
 }
 
 func mustWriteEntireFile(name string, content []byte) {
+	if name == "-" {
+		fmt.Print(string(content))
+		return
+	}
 	fh, errCreat := os.Create(name)
-	assertSuccess("create", errCreat)
+	mustOk("create", errCreat)
 	defer fh.Close()
 
 	_, errWrite := fh.Write(content)
-	assertSuccess("write", errWrite)
+	mustOk("write", errWrite)
 }
-
 
 func subToJson(links []byte, normalizeTags bool) json.RawMessage {
 	cfgjson, errconv := share.ConvertShareLinksToXrayJson(string(links), "")
-	assertSuccess("convert", errconv)
+	mustOk("convert", errconv)
 
 	cfg, errjson := json.MarshalIndent(cfgjson, "", "  ")
-	assertSuccess("marshal", errjson)
+	mustOk("marshal", errjson)
 
 	if normalizeTags {
 		counter := 0
@@ -112,8 +121,8 @@ func main() {
 	var testUrl string
 	var testFiltersBelowTimeout int64
 	var testFiltersAboveTimeout int64
-	flag.StringVar(&inFile, "i", "", "")
-	flag.StringVar(&outFile, "o", "", "")
+	flag.StringVar(&inFile, "i", "-", "")
+	flag.StringVar(&outFile, "o", "-", "")
 	flag.BoolVar(&normalizeTags, "uniqtags", true, "")
 	flag.StringVar(&testUrl, "turl", "https://gstatic.com/generate_204", "")
 	flag.Int64Var(&testFiltersAboveTimeout, "tmax", 5000, "")
@@ -122,14 +131,14 @@ func main() {
 	flag.Usage = func() {
 		w := flag.CommandLine.Output()
 
-		fmt.Fprint(w, ansi(
+		fmt.Fprint(w, fmtcolor(
 `@Y{-V}
   Print version info
-@Y{-U -i URL_SUBS [-o FILEPATH_JSON=generated-config.json] [-uniqtags]}
+@Y{-U [-i URL_SUBS=-] [-o FILEPATH_JSON=-] [-uniqtags]}
   Convert share links to json config
-@Y{-C -i URL_JSON [-o FILEPATH_SUBS=generated-links.txt]}
+@Y{-C [-i URL_JSON=-] [-o FILEPATH_SUBS=-]}
   Convert json config to share links
-@Y{-T [-tmax MS] [-tmin MS] [-turl URL=https://gstatic.com/generate_204] -i URL_JSON_OR_SUBS [-o FILEPATH_JSON=generated-config.json] [-uniqtags]}
+@Y{-T [-tmax MS] [-tmin MS] [-turl URL=https://gstatic.com/generate_204] [-i URL_JSON_OR_SUBS=-] [-o FILEPATH_JSON=-] [-uniqtags]}
   Filter good configs
 `))
 	}
@@ -141,7 +150,6 @@ func main() {
 		fmt.Printf("%s %s %s %s %s %s\n", os.Args[0], version, commitHash, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 		os.Exit(0)
 	case urlToConfig:
-		if inFile == "" { die("no input file") }
 		links := mustReadEntireFile(inFile)
 
 		// FIXME: Additionally, produced config isn't useful because Observatory selector wants you
@@ -150,33 +158,29 @@ func main() {
 		// go encoder is retarded and will insert nulls which causes errors in xray interpreter.
 		cfg := subToJson(links, normalizeTags)
 		
-		if outFile == "" { outFile = "generated-config.json" }
 		mustWriteEntireFile(outFile, cfg)
 	case configToUrl:
-		if inFile == "" { die("no input file") }
 		cfg := mustReadEntireFile(inFile)
 
 		links, errconv := share.ConvertXrayJsonToShareLinks(cfg)
-		assertSuccess("convert", errconv)
+		mustOk("convert", errconv)
 
-		if outFile == "" { outFile = "generated-links.txt" }
 		mustWriteEntireFile(outFile, []byte(links))
 
 	case testConfigs:
-		if inFile == "" { die("no input file") }
-
 		configIn := mustReadEntireFile(inFile)
 
 		// we want json input file. if it's not, try to normalize it first by converting from share links.
 		{
-			if nil != json.NewDecoder(
-				&confjson.Reader{ Reader: strings.NewReader(string(configIn))},
-			).Decode(
-				&struct{Outbounds []json.RawMessage `json:"outbounds"`}{},
-			) {
-				var errJson error
-				configIn, errJson = json.Marshal(subToJson(configIn, normalizeTags))
-			    assertSuccess("marshal json", errJson)
+			// if nil != json.NewDecoder(
+			// 	&confjson.Reader{ Reader: strings.NewReader(string(configIn))},
+			// ).Decode(
+			// 	&struct{Outbounds []json.RawMessage `json:"outbounds"`}{},
+			// ) {
+			// 	configIn = subToJson(configIn, normalizeTags)
+			// }
+			if !json.Valid(configIn) {
+			 	configIn = subToJson(configIn, normalizeTags)
 			}
 		}
 		configString := string(configIn)
@@ -188,7 +192,7 @@ func main() {
 			Outbounds []json.RawMessage `json:"outbounds,omitempty"` 
 		}
 		var config configOut
-		assertSuccess("decode raw config", 
+		mustOk("decode raw config", 
 			json.NewDecoder(&confjson.Reader{Reader: strings.NewReader(configString)}).Decode(&config))
 
 		var tags []string
@@ -212,14 +216,18 @@ func main() {
 		for start := 0; start < len(pingItems); start += BATCH {
 			end := min(start+BATCH, len(pingItems))
 			batchOfPingItems := pingItems[start:end]
-			batchOfPingResults, errPing := xray.PingBatch(batchOfPingItems, int(testFiltersAboveTimeout/1000), testUrl)
-			softAssertSuccess("ping batch", errPing)
+			batchOfPingResults, errPing := xray.PingBatch(batchOfPingItems, max(1, int(testFiltersAboveTimeout/1000)), testUrl)
+			if errPing != nil {
+				batchOfPingResults = make([]xray.PingBatchResult, len(batchOfPingItems))
+				// NOTE: len(pingResults) stays in sync with tags.
+			}
+			logIfError("ping batch", errPing)
 			pingResults = append(pingResults, batchOfPingResults...)
 		}
 
 		type outbound struct{o json.RawMessage; d int64}; goodOutbounds := []outbound{}
 		for i, pingResult := range pingResults {
-			fmt.Printf("Tag: %s\n", tags[i])
+			log.Printf("Tag: %s\n", tags[i])
 
 			var delayString string
 			switch pingResult.Delay {
@@ -231,17 +239,16 @@ func main() {
 			if pingResult.Success && 
 			pingResult.Delay < testFiltersAboveTimeout && 
 			pingResult.Delay > testFiltersBelowTimeout {
-				fmt.Printf(ansi("@G{Verdict: GOOD\nDelay: %v}\n\n"), delayString)
+				log.Printf(fmtcolor("\n@G{Verdict: GOOD\nDelay: %v}\n\n"), delayString)
 				goodOutbounds = append(goodOutbounds, outbound{config.Outbounds[i], pingResult.Delay})
 			} else {
-				fmt.Printf(ansi("@R{Verdict: BAD\nDelay: %v\nError: %v}\n\n"), delayString, pingResult.Error)
+				log.Printf(fmtcolor("\n@R{Verdict: BAD\nDelay: %v\nError: %v}\n\n"), delayString, pingResult.Error)
 			}
 		}
 		sort.Slice(goodOutbounds, func(i, j int) bool { return goodOutbounds[i].d < goodOutbounds[j].d })
 		var configGood configOut
 		for _, outbound := range goodOutbounds { configGood.Outbounds = append(configGood.Outbounds, outbound.o) } 
 		configGoodBytes, _ := json.MarshalIndent(configGood, "", "    ")
-		if outFile == "" { outFile = "generated-config.json" }
 		mustWriteEntireFile(outFile, configGoodBytes)
 	default:
 		fmt.Printf("one of commands must be specified\n")

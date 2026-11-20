@@ -62,7 +62,7 @@ var (
 	st = regexp.MustCompile("\033\\[\\d+(;\\d+)?m")
 )
 
-func ansi(s string) string {
+func fmtcolor(s string) string {
 	return re.ReplaceAllStringFunc(s, func(m string) string {
 		if m[1:2] == "*" {
 			rainbow := "RYGCBM"
