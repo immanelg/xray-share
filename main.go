@@ -63,9 +63,15 @@ func mustReadEntireFile(name string) []byte {
 		mustOk("read input file", errReadIn)
 		return content
 	}
+	// TODO: -iretries
 	httpClient := &http.Client{Timeout: 10*time.Second}
-	response, errHttp := httpClient.Get(name)
-	mustOk("read remote file", errHttp)
+	req, err := http.NewRequest(http.MethodGet, name, nil)
+	mustOk("create request", err)
+	proxyURL, errProxyEnv := http.ProxyFromEnvironment(req)
+	mustOk("get proxy env var", errProxyEnv)
+	if proxyURL != nil { log.Printf("using proxy %s", proxyURL.String()) }
+	response, errHttp := httpClient.Do(req)
+	mustOk("read http file", errHttp)
 	defer response.Body.Close()
 	body, _ := io.ReadAll(response.Body)
 	return body
@@ -264,6 +270,7 @@ func main() {
 				log.Printf(fmtcolor("\n@R{Verdict: BAD\nDelay: %v\nError: %v}\n\n"), delayString, pingResult.Error)
 			}
 		}
+		log.Printf("filtered %d good configs", len(goodOutbounds))
 		sort.Slice(goodOutbounds, func(i, j int) bool { return goodOutbounds[i].d < goodOutbounds[j].d })
 		var configGood configOut
 		for _, outbound := range goodOutbounds { configGood.Outbounds = append(configGood.Outbounds, outbound.o) } 

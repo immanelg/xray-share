@@ -45,7 +45,7 @@ Examples:
 xray-share -C -i config.json -o sub.txt
 
 # sub->config
-xray-shareurl -U -i https://example/sub.txt -o outbounds.json
+all_proxy=socks5h://localhost:2080 xray-shareurl -U -i https://example/sub.txt -o outbounds.json
 # Note: -U only generates outbounds config. you should also probably have /etc/xray/base-config.json without outbounds.
 
 # test configs and keep fast and working ones
